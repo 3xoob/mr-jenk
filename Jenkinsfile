@@ -137,14 +137,14 @@ pipeline {
   post {
     success {
       echo "Buy-01 ${env.BUILD_NUMBER} deployed successfully to ${params.DEPLOY_ENV}."
-      emailext(
+      mail(
         subject: "Buy-01 SUCCESS: #${env.BUILD_NUMBER}",
         body: "Build succeeded and deployed to ${params.DEPLOY_ENV}.\n\nBuild URL: ${env.BUILD_URL}",
         to: "${env.NOTIFY_EMAIL}"
       )
     }
     unstable {
-      emailext(
+      mail(
         subject: "Buy-01 UNSTABLE: #${env.BUILD_NUMBER}",
         body: "Build is unstable. Check test reports and console output.\n\nBuild URL: ${env.BUILD_URL}",
         to: "${env.NOTIFY_EMAIL}"
@@ -155,7 +155,7 @@ pipeline {
       withCredentials([string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET')]) {
         sh './scripts/rollback.sh || true'
       }
-      emailext(
+      mail(
         subject: "Buy-01 FAILED: #${env.BUILD_NUMBER}",
         body: "Build failed. Rollback was attempted.\n\nBuild URL: ${env.BUILD_URL}",
         to: "${env.NOTIFY_EMAIL}"
