@@ -14,7 +14,7 @@ else
 fi
 
 docker compose down --remove-orphans || true
-GATEWAY_PORT="${GATEWAY_PORT}" FRONTEND_PORT="${FRONTEND_PORT}" DEPLOY_TAG="${DEPLOY_TAG:-local}" docker compose up -d
+GATEWAY_PORT="${GATEWAY_PORT}" FRONTEND_PORT="${FRONTEND_PORT}" DEPLOY_TAG="${DEPLOY_TAG:-local}" docker compose up -d --build
 GATEWAY_PORT="${GATEWAY_PORT}" FRONTEND_PORT="${FRONTEND_PORT}" ./scripts/health-check.sh
 
 echo "Rollback completed."
