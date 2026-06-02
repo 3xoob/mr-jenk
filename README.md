@@ -1,0 +1,626 @@
+# Buy-01 Marketplace
+
+Buy-01 is a full-stack marketplace application built with Spring Boot microservices, MongoDB, Spring Cloud Gateway, Eureka Discovery, JWT authentication, local image storage, and an Angular single-page frontend.
+
+The application supports public product browsing, client accounts, seller accounts, seller-owned product management, image uploads, product-media association, and role-based access control.
+
+## Features
+
+- Public product listing and product detail pages.
+- Client and seller registration/login with JWT authentication.
+- BCrypt password hashing.
+- Profile read/update for authenticated users.
+- Seller-only product create, update, and delete operations.
+- Product ownership checks for seller updates/deletes.
+- Seller media upload, list, download, and delete operations.
+- Image validation by MIME type, file size, and file signature.
+- Automatic association between uploaded media and selected products.
+- Angular frontend with guards, interceptors, services, standalone components, and responsive UI.
+
+## Architecture
+
+```text
+Browser
+  |
+  v
+Angular Frontend :4200
+  |
+  v
+Spring Cloud Gateway :8080
+  |
+  +-- User Service :8081
+  +-- Product Service :8082
+  +-- Media Service :8083
+  |
+  v
+Eureka Discovery :8761
+
+MongoDB :27017
+Local uploads: ./uploads
+```
+
+## Services
+
+| Service | Responsibility |
+| --- | --- |
+| `discovery-service` | Eureka service registry. |
+| `gateway-service` | External API boundary, CORS, JWT validation, routing, identity header forwarding. |
+| `user-service` | User registration, login, JWT issuing, BCrypt hashing, profile endpoints. |
+| `product-service` | Public product reads and seller-owned product CRUD. |
+| `media-service` | Image upload/download/delete, validation, metadata persistence, product association. |
+| `frontend` | Angular SPA for public browsing, auth, profile, seller catalog, and media management. |
+
+## Domain Model
+
+The implementation follows the provided diagram in `image.png`.
+
+### User
+
+```text
+id: String
+name: String
+email: String
+password: String, BCrypt hash
+role: CLIENT | SELLER
+avatar: String
+createdAt: Instant
+updatedAt: Instant
+```
+
+### Product
+
+```text
+id: String
+name: String
+description: String
+price: Double
+quantity: Integer
+userId: String
+imageUrls: List<String>
+createdAt: Instant
+updatedAt: Instant
+```
+
+### Media
+
+```text
+id: String
+imagePath: String
+productId: String
+sellerId: String
+contentType: String
+size: Long
+createdAt: Instant
+```
+
+Relationships:
+
+- One `User` can own many `Product` records through `Product.userId`.
+- One `Product` can have many `Media` records through `Media.productId`.
+- Uploaded media is also linked into `Product.imageUrls` for frontend display.
+
+## Quick Start
+
+Prerequisites:
+
+- Docker
+- Docker Compose v2
+
+Start the full application:
+
+```bash
+./run-full-project.sh
+```
+
+The script builds and starts all services, waits for the gateway to become healthy, waits for Eureka registration, and prints the access URLs.
+
+Default URLs when using the script:
+
+| Surface | URL |
+| --- | --- |
+| Frontend | `http://localhost:4200` |
+| Gateway API | `http://localhost:18080/api` |
+| Gateway health | `http://localhost:18080/actuator/health` |
+| Eureka dashboard | `http://localhost:8761` |
+
+The script uses gateway port `18080` by default to avoid common local conflicts with port `8080`.
+
+To override ports:
+
+```bash
+GATEWAY_PORT=8080 FRONTEND_PORT=4200 ./run-full-project.sh
+```
+
+Stop the stack:
+
+```bash
+GATEWAY_PORT=18080 FRONTEND_PORT=4200 docker compose down
+```
+
+Reset all persisted MongoDB data:
+
+```bash
+GATEWAY_PORT=18080 FRONTEND_PORT=4200 docker compose down -v
+```
+
+## Manual Access
+
+There are no hardcoded seeded users. Register accounts from the UI or through the API.
+
+Recommended manual test accounts:
+
+```text
+Seller
+Email: seller@example.com
+Password: Password123!
+Role: SELLER
+
+Client
+Email: client@example.com
+Password: Password123!
+Role: CLIENT
+```
+
+If an email already exists, use another email or reset MongoDB with `docker compose down -v`.
+
+## API Overview
+
+Base URL when using `run-full-project.sh`:
+
+```text
+http://localhost:18080/api
+```
+
+Base URL when using plain Docker Compose defaults:
+
+```text
+http://localhost:8080/api
+```
+
+### Public Endpoints
+
+```text
+POST /auth/register
+POST /auth/login
+GET  /products
+GET  /products/{id}
+GET  /media/images/{id}
+```
+
+### Protected Endpoints
+
+
+```text
+GET    /users/me
+PUT    /users/me
+POST   /products              SELLER only
+PUT    /products/{id}          SELLER owner only
+DELETE /products/{id}          SELLER owner only
+GET    /media                  SELLER only
+POST   /media/images           SELLER only
+DELETE /media/images/{id}      SELLER owner only
+```
+
+## API Examples
+
+Register a seller:
+
+```bash
+curl -X POST http://localhost:18080/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Seller","email":"seller@example.com","password":"Password123!","role":"SELLER"}'
+```
+
+Login:
+
+```bash
+curl -X POST http://localhost:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"seller@example.com","password":"Password123!"}'
+```
+
+Use the returned token:
+
+```text
+Authorization: Bearer <token>
+```
+
+Create a product as a seller:
+
+```bash
+curl -X POST http://localhost:18080/api/products \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"name":"Laptop","description":"Good laptop","price":120.5,"quantity":10,"imageUrls":[]}'
+```
+
+Upload product media as a seller:
+
+```bash
+curl -X POST http://localhost:18080/api/media/images \
+  -H 'Authorization: Bearer <token>' \
+  -F 'productId=<product-id>' \
+  -F 'file=@image.png'
+```
+
+## Media Rules
+
+- Only image files are accepted.
+- Maximum upload size is `2 MB`.
+- The backend validates MIME type and image signatures for PNG, JPEG, GIF, and WebP.
+- Image bytes are stored in `./uploads`.
+- MongoDB stores media metadata, not image bytes.
+- Uploaded images are automatically associated with the selected product.
+
+## Security
+
+- Passwords are stored as BCrypt hashes.
+- JWT tokens are issued by `user-service` and validated by `gateway-service`.
+- Protected routes require `Authorization: Bearer <token>`.
+- The gateway forwards authenticated identity via `X-User-Id`, `X-User-Email`, and `X-User-Role`.
+- Seller-only endpoints enforce role checks.
+- Product update/delete operations enforce ownership.
+- Media delete operations enforce ownership.
+- Input validation is implemented with Jakarta Validation and service-level checks.
+- Sensitive data such as password hashes is not returned in API responses.
+- HTTPS is not enabled for local Docker development. It is documented as a production deployment requirement.
+
+## Frontend
+
+The Angular frontend includes:
+
+- Standalone components.
+- Lazy routes.
+- Functional route guards.
+- HTTP interceptor for JWT attachment.
+- Reactive forms with inline validation.
+- Role-aware navigation.
+- Public product listing/detail pages.
+- Seller dashboard, product form, and media manager.
+- Responsive styling for desktop and mobile.
+
+Local frontend development:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+The frontend calls `/api`. Local development uses `frontend/proxy.conf.json`, and Docker uses `frontend/proxy.docker.conf.json`.
+
+## Backend Development
+
+Start MongoDB:
+
+```bash
+docker compose up mongodb
+```
+
+Run services individually from their service directories:
+
+```bash
+mvn spring-boot:run
+```
+
+Backend modules are under `backend/`:
+
+```text
+backend/discovery-service
+backend/gateway-service
+backend/user-service
+backend/product-service
+backend/media-service
+```
+
+## Error Handling
+
+Services return structured JSON errors:
+
+```json
+{
+  "status": 400,
+  "message": "Validation message",
+  "timestamp": "2026-05-02T12:00:00Z"
+}
+```
+
+Common status codes:
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Validation error, invalid upload, or upload too large. |
+| `401` | Missing or invalid JWT. |
+| `403` | Wrong role or ownership violation. |
+| `404` | Resource not found. |
+| `405` | Unsupported HTTP method. |
+| `409` | Duplicate email. |
+
+## Verification Checklist
+
+The following flows were tested through the gateway and frontend proxy:
+
+```text
+seller_register HTTP:201
+client_register HTTP:201
+duplicate_email HTTP:409
+seller_me HTTP:200
+client_product_create_blocked HTTP:403
+seller_product_create HTTP:201
+product_get HTTP:200
+product_update HTTP:200
+invalid_upload HTTP:400
+valid_upload HTTP:201
+product_get_after_upload HTTP:200
+product_image_linked OK
+image_download HTTP:200
+media_delete HTTP:204
+product_delete HTTP:204
+frontend_products_route HTTP:200
+frontend_api_proxy HTTP:200
+```
+
+## Known Choices
+
+- Kafka is not included because it is optional for this project.
+- MinIO is not included. Images are stored on the local filesystem to keep the deployment simple and auditable.
+- HTTPS is not enabled locally. Use a reverse proxy or platform TLS termination for production.
+- No admin role is implemented because the required roles are client and seller.
+
+## Jenkins CI/CD Audit Setup
+
+This project includes a Jenkins pipeline that automates checkout, tool validation, backend tests, frontend tests, Docker builds, Docker Compose deployment, health verification, rollback, JUnit report publishing, and email notifications.
+
+CI/CD files:
+
+```text
+Jenkinsfile
+jenkins/Dockerfile
+jenkins/docker-compose.jenkins.yml
+scripts/health-check.sh
+scripts/rollback.sh
+frontend/karma.conf.js
+```
+
+### Pipeline Flow
+
+```text
+Checkout
+Validate Tools
+Backend Tests
+Frontend Install
+Frontend Tests
+Frontend Build
+Docker Build
+Backup Current Deployment
+Deploy
+Health Check
+Email Notification / Rollback
+```
+
+Any failing build, test, deploy, or health-check command returns a non-zero exit code and stops the pipeline. On failure, Jenkins runs `scripts/rollback.sh` and sends a failure email.
+
+### Start Jenkins Locally
+
+Prerequisites:
+
+- Docker
+- Docker Compose v2
+
+Start Jenkins:
+
+```bash
+docker compose -f jenkins/docker-compose.jenkins.yml up -d --build
+```
+
+Open Jenkins:
+
+```text
+http://localhost:8085
+```
+
+Get the first admin password:
+
+```bash
+docker logs buy01-jenkins
+```
+
+The Jenkins image installs Java, Maven, Git, Node.js, Docker CLI, Docker Compose, and Chromium for Angular headless tests.
+
+### Required Jenkins Plugins
+
+Install these plugins from **Manage Jenkins > Plugins**:
+
+- Pipeline
+- Git
+- GitHub
+- GitHub Branch Source
+- Docker Pipeline
+- JUnit
+- Credentials Binding
+- Email Extension
+
+### Jenkins Credentials
+
+Create this credential before running the pipeline:
+
+```text
+Location: Manage Jenkins > Credentials > System > Global credentials
+Kind: Secret text
+ID: jwt-secret
+Secret: a long random JWT signing secret
+```
+
+The pipeline injects this value as `JWT_SECRET` during Docker build, deploy, and rollback. The application Compose file requires `JWT_SECRET`; no JWT signing secret is hardcoded in committed configuration.
+
+For local development, copy `.env.example` to `.env` and set a local secret. The real `.env` file is ignored by Git.
+
+### Email Notifications
+
+The pipeline sends success, unstable, and failure emails to:
+
+```text
+ali.almoumnin@gmail.com
+```
+
+Configure SMTP in Jenkins:
+
+```text
+Manage Jenkins > System > Extended E-mail Notification
+SMTP server: your SMTP provider
+SMTP port: your SMTP provider port
+Use SMTP Authentication: enabled if required
+Default Content Type: text/plain
+```
+
+Run a test email from Jenkins after configuring SMTP. Without working SMTP settings, the pipeline can call `emailext`, but delivery will fail.
+
+### Jenkins Job Configuration
+
+Create a Pipeline job:
+
+```text
+Job type: Pipeline
+Definition: Pipeline script from SCM
+SCM: Git
+Repository URL: <your GitHub repository URL>
+Branch: main
+Script Path: Jenkinsfile
+```
+
+The `Jenkinsfile` includes `githubPush()` and the job should also enable:
+
+```text
+GitHub hook trigger for GITScm polling
+```
+
+### GitHub Webhook
+
+In GitHub, add a webhook:
+
+```text
+Payload URL: http://<jenkins-host>:8085/github-webhook/
+Content type: application/json
+Events: Push events
+```
+
+After this, every push to `main` should start the pipeline automatically. If Jenkins runs on a private machine, expose Jenkins with a reachable URL or use a tunnel/reverse proxy for webhook delivery.
+
+### Parameterized Builds
+
+The pipeline supports these build parameters:
+
+| Parameter | Default | Purpose |
+| --- | --- | --- |
+| `DEPLOY_ENV` | `local` | Deployment target label. |
+| `GATEWAY_PORT` | `18080` | Host port for the gateway. |
+| `FRONTEND_PORT` | `4200` | Host port for the Angular frontend. |
+| `RUN_BACKEND_TESTS` | `true` | Enables Maven tests. |
+| `RUN_FRONTEND_TESTS` | `true` | Enables Angular/Karma tests. |
+
+### Automated Tests And Reports
+
+Backend tests run with:
+
+```bash
+cd backend
+mvn clean test
+```
+
+Jenkins publishes backend JUnit reports from:
+
+```text
+backend/**/target/surefire-reports/*.xml
+```
+
+Frontend tests run with:
+
+```bash
+cd frontend
+npm ci
+npm run test:ci
+```
+
+Jenkins publishes frontend JUnit reports from:
+
+```text
+frontend/test-results/**/*.xml
+```
+
+Test report publishing is strict. Missing or failing test reports mark the build as failed or unstable instead of silently passing.
+
+### Deployment
+
+After successful tests and builds, Jenkins deploys with Docker Compose:
+
+```bash
+DEPLOY_TAG=<git-commit-or-build-number> JWT_SECRET=<jenkins-secret> GATEWAY_PORT=18080 FRONTEND_PORT=4200 docker compose up -d
+```
+
+Docker Compose services are tagged with `DEPLOY_TAG`, for example:
+
+```text
+buy01-gateway-service:<DEPLOY_TAG>
+buy01-frontend:<DEPLOY_TAG>
+```
+
+Health verification checks:
+
+- Gateway health endpoint.
+- Frontend availability.
+- Eureka registry availability.
+- Required service registration in Eureka.
+
+### Rollback
+
+Before deployment, Jenkins saves the previous successful deployment tag in `.deploy-backup/rollback-tag` when available. After a successful health check, Jenkins writes the current tag to `.deploy-backup/last-successful-tag`.
+
+If deployment or health verification fails, Jenkins runs:
+
+```bash
+./scripts/rollback.sh
+```
+
+The rollback script sets `DEPLOY_TAG` to the previous successful tag, restarts Docker Compose with that tag, and runs the same health checks. This depends on previous Docker images still being available on the Jenkins/Docker host.
+
+### Jenkins Dashboard Permissions
+
+Recommended audit configuration:
+
+```text
+Manage Jenkins > Security
+Security Realm: Jenkins own user database
+Authorization: Matrix-based security
+Anonymous: no permissions
+Authenticated users: Overall/Read only if needed
+Developers: Job/Read, Job/Build, Job/Cancel, View/Read
+Admins: Overall/Administer
+```
+
+Disable anonymous write/build permissions. Capture screenshots of the security matrix and user list as audit evidence.
+
+### Intentional Failure Checks
+
+Use one of these safe temporary tests to prove Jenkins responds correctly to failures:
+
+```text
+Change one frontend expectation to a wrong value and push.
+Change one backend assertion to fail and push.
+Temporarily set RUN_FRONTEND_TESTS=true and break `npm run test:ci`.
+```
+
+Expected result:
+
+```text
+Jenkins marks the build failed.
+The failing stage stops downstream deployment.
+JUnit report shows the failing test.
+Failure email is sent.
+Rollback is attempted if failure occurs after deployment starts.
+```
+
+Revert the intentional failure and push again to verify recovery.
+
+### Distributed Builds
+
+The current pipeline uses `agent any` and does not require multiple Jenkins agents. Distributed builds are not implemented by default. If the audit requires this bonus item, add Jenkins nodes with labels such as `java-docker-agent` and `node-agent`, then move backend and frontend stages to labeled agents or parallel stages.
