@@ -440,7 +440,7 @@ Install these plugins from **Manage Jenkins > Plugins**:
 - Docker Pipeline
 - JUnit
 - Credentials Binding
-- Email Extension
+- Mailer
 
 ### Jenkins Credentials
 
@@ -468,14 +468,14 @@ ali.almoumnin@gmail.com
 Configure SMTP in Jenkins:
 
 ```text
-Manage Jenkins > System > Extended E-mail Notification
-SMTP server: your SMTP provider
-SMTP port: your SMTP provider port
+Manage Jenkins > System > E-mail Notification
+SMTP server: your SMTP provider, for example smtp.gmail.com
+SMTP port: your SMTP provider port, for example 587
 Use SMTP Authentication: enabled if required
-Default Content Type: text/plain
+Use TLS: enabled if required
 ```
 
-Run a test email from Jenkins after configuring SMTP. Without working SMTP settings, the pipeline can call `emailext`, but delivery will fail.
+Run a test email from Jenkins after configuring SMTP. Without working SMTP settings, the pipeline can call `mail`, but delivery will fail.
 
 ### Jenkins Job Configuration
 
