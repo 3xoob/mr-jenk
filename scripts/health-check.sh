@@ -12,10 +12,17 @@ wait_for_url() {
   local name="$1"
   local url="$2"
   local attempts="${3:-90}"
+  local host_header="${4:-}"
 
   echo "Waiting for ${name}: ${url}"
   for _ in $(seq 1 "${attempts}"); do
-    if curl -fsS "${url}" >/dev/null 2>&1; then
+    if [[ -n "${host_header}" ]]; then
+      curl_args=(-H "Host: ${host_header}")
+    else
+      curl_args=()
+    fi
+
+    if curl -fsS "${curl_args[@]}" "${url}" >/dev/null 2>&1; then
       echo "${name} is reachable."
       return 0
     fi
@@ -27,7 +34,7 @@ wait_for_url() {
 }
 
 wait_for_url "gateway health" "${GATEWAY_HEALTH_URL}"
-wait_for_url "frontend" "${FRONTEND_URL}" 45
+wait_for_url "frontend" "${FRONTEND_URL}" 45 "localhost"
 wait_for_url "Eureka registry" "${EUREKA_URL}"
 
 echo "Checking Eureka service registrations..."
