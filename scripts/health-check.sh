@@ -3,9 +3,10 @@ set -euo pipefail
 
 GATEWAY_PORT="${GATEWAY_PORT:-18080}"
 FRONTEND_PORT="${FRONTEND_PORT:-4200}"
-GATEWAY_HEALTH_URL="http://localhost:${GATEWAY_PORT}/actuator/health"
-FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
-EUREKA_URL="http://localhost:8761/eureka/apps"
+HEALTHCHECK_HOST="${HEALTHCHECK_HOST:-localhost}"
+GATEWAY_HEALTH_URL="http://${HEALTHCHECK_HOST}:${GATEWAY_PORT}/actuator/health"
+FRONTEND_URL="http://${HEALTHCHECK_HOST}:${FRONTEND_PORT}"
+EUREKA_URL="http://${HEALTHCHECK_HOST}:8761/eureka/apps"
 
 wait_for_url() {
   local name="$1"

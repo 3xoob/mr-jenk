@@ -22,6 +22,7 @@ pipeline {
     COMPOSE_PROJECT_NAME = 'buy01'
     GATEWAY_PORT = "${params.GATEWAY_PORT}"
     FRONTEND_PORT = "${params.FRONTEND_PORT}"
+    HEALTHCHECK_HOST = 'host.docker.internal'
     NOTIFY_EMAIL = 'ali.almoumnin@gmail.com'
     DEPLOY_TAG = 'local'
   }
