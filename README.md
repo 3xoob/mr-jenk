@@ -371,6 +371,8 @@ frontend_api_proxy HTTP:200
 
 This project includes a Jenkins pipeline that automates checkout, tool validation, backend tests, frontend tests, Docker builds, Docker Compose deployment, health verification, rollback, JUnit report publishing, and email notifications.
 
+Audit verification uses a GitHub webhook pointed at Jenkins `/github-webhook/` so pushes to `main` trigger the pipeline automatically.
+
 CI/CD files:
 
 ```text
