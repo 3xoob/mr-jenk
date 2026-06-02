@@ -31,7 +31,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be provided}
       AVATAR_UPLOAD_DIR: /app/uploads/avatars
     volumes:
-      - ./uploads/avatars:/app/uploads/avatars
+      - avatar-uploads:/app/uploads/avatars
     depends_on:
       - mongodb
       - discovery-service
@@ -59,7 +59,7 @@ services:
       UPLOAD_DIR: /app/uploads
       PRODUCT_SERVICE_URL: http://product-service:8082
     volumes:
-      - ./uploads:/app/uploads
+      - media-uploads:/app/uploads
     depends_on:
       - mongodb
       - discovery-service
@@ -90,8 +90,8 @@ services:
       - gateway-service
     ports:
       - "${FRONTEND_PORT:-4200}:4200"
-    volumes:
-      - ./frontend/src:/app/src
 
 volumes:
   mongo-data:
+  avatar-uploads:
+  media-uploads:
