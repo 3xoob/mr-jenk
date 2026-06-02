@@ -25,7 +25,7 @@ describe('TokenStorageService', () => {
     });
 
     expect(service.isLoggedIn()).toBeTrue();
-    expect(service.role()).toBe('CLIENT');
+    expect(service.role()).toBe('SELLER');
 
     service.clear();
 
